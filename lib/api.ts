@@ -1,4 +1,11 @@
-export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:2080/api';
+const getApiUrl = () => {
+  if (typeof window !== 'undefined') {
+    return process.env.NEXT_PUBLIC_API_URL || 'https://printexpress.com.eg/api';
+  }
+  return process.env.INTERNAL_API_URL || 'http://127.0.0.1:2080/api';
+};
+
+export const API_BASE_URL = getApiUrl();
 
 /**
  * Helper to get the auth token from wherever it's stored (localStorage, cookies, etc.)
