@@ -1,0 +1,7 @@
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteBase /
+
+    # Forward all dashboard requests to Next.js Dashboard (Port 2050)
+    RewriteRule ^(.*)$ http://127.0.0.1:2050/$1 [P,L]
+</IfModule>

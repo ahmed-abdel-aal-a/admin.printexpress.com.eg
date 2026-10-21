@@ -1,0 +1,8 @@
+{
+  "name": "Luxury Dashboard",
+  "description": "A premium e-commerce dashboard with product and variant management.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
