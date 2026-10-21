@@ -1,0 +1,7 @@
+{
+  "headers": {
+    "x-nextjs-stale-time": "4294967294",
+    "x-nextjs-prerender": "1",
+    "x-next-cache-tags": "_N_T_/layout,_N_T_/printing/layout,_N_T_/printing/product-types/layout,_N_T_/printing/product-types/edit/layout,_N_T_/printing/product-types/edit/types/layout,_N_T_/printing/product-types/edit/types/page,_N_T_/printing/product-types/edit/types"
+  }
+}
