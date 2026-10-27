@@ -8,7 +8,7 @@
   "components\\ClientShell.tsx -> @/components/PushNotificationsSetup": {
     "id": 89642,
     "files": [
-      "static/chunks/9642.4e5bf712df180b1b.js"
+      "static/chunks/9642.818c4ed3da1aa99b.js"
     ]
   },
   "node_modules\\next\\dist\\client\\index.js -> ../pages/_app": {
