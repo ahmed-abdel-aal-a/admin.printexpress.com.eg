@@ -2,6 +2,10 @@
     RewriteEngine On
     RewriteBase /
 
+    # Redirect root to /login if no token cookie exists (prevents localhost internal redirect leak)
+    RewriteCond %{HTTP_COOKIE} !token [NC]
+    RewriteRule ^$ /login [R=307,L]
+
     # 1. Forward all API calls directly to Laravel Backend Subdomain (LSPHP)
     RewriteRule ^api/(.*)$ https://api.printexpress.com.eg/api/$1 [P,L]
 
