@@ -483,8 +483,25 @@ export function OrderDetailsModal({ order, isOpen, onClose, onOrderUpdated }: Or
                                 )}
                               </div>
                               <div className="flex flex-wrap gap-2">
-                                {Object.entries(item.uploaded_files).map(([category, path]) => {
-                                  if (!path || path === 'deleted_by_system') return null;
+                                {Object.entries(item.uploaded_files).map(([category, fileVal]) => {
+                                  const filePath = typeof fileVal === 'object' && fileVal !== null ? (fileVal as any).path : fileVal;
+                                  const fileName = typeof fileVal === 'object' && fileVal !== null ? (fileVal as any).name : null;
+                                  const pageCount = typeof fileVal === 'object' && fileVal !== null ? (fileVal as any).page_count : null;
+                                  const isArchived = filePath === 'deleted_by_system' || filePath === 'deleted_by_retention' || item.file_status === 'cleaned_by_retention';
+
+                                  if (!filePath) return null;
+
+                                  if (isArchived) {
+                                    return (
+                                      <span
+                                        key={category}
+                                        className="inline-flex items-center gap-1.5 text-xs text-amber-700 bg-amber-50 border border-amber-200 px-2.5 py-1.5 rounded-lg font-medium"
+                                      >
+                                        تمت أرشفة ملف {getCategoryLabel(category)} لمرور فترة الاحتفاظ
+                                      </span>
+                                    );
+                                  }
+
                                   const key = `print-${item.id}-${category}`;
                                   const isDownloading = downloadingKey === key;
                                   return (
@@ -494,9 +511,12 @@ export function OrderDetailsModal({ order, isOpen, onClose, onOrderUpdated }: Or
                                       onClick={() => handleDownloadPrintFile(order.id, item.id, category)}
                                       disabled={isDownloading}
                                       className="inline-flex items-center gap-1.5 text-xs text-blue-700 bg-white hover:bg-blue-50 border border-slate-200 hover:border-blue-300 px-2.5 py-1.5 rounded-lg shadow-2xs font-medium cursor-pointer transition-colors disabled:opacity-50"
+                                      title={fileName ? `الملف: ${fileName}` : undefined}
                                     >
                                       <Download className="w-3.5 h-3.5 text-blue-600" />
-                                      {isDownloading ? "جاري التحميل..." : `تحميل ${getCategoryLabel(category)}`}
+                                      {isDownloading 
+                                        ? "جاري التحميل..." 
+                                        : `تحميل ${getCategoryLabel(category)}${pageCount ? ` (${pageCount} ص)` : ''}${fileName ? ` - ${fileName}` : ''}`}
                                     </button>
                                   );
                                 })}

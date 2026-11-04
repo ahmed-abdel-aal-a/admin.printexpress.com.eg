@@ -47,6 +47,14 @@ export interface PrintingAttribute {
   updated_at?: string;
 }
 
+export interface UploadCategorySlot {
+  id: string;
+  label: string;
+  help_text?: string | null;
+  is_required: boolean;
+  allowed_extensions: string[];
+}
+
 export interface PrintingType {
   id: number;
   printing_product_type_id: number;
@@ -69,7 +77,7 @@ export interface PrintingType {
     pricing_by_image_count?: boolean;
     allowed_extensions?: string[];
   } | null;
-  upload_categories: string[] | null;
+  upload_categories: (string | UploadCategorySlot)[] | null;
   standard_roll_sizes: number[] | null;
   max_print_width: number | null;
   max_print_length: number | null;

@@ -17,6 +17,82 @@ import { useState } from 'react';
 import toast from 'react-hot-toast';
 import { Trash2 } from 'lucide-react';
 
+export interface UploadSlotConfig {
+  id: string;
+  label: string;
+  help_text?: string | null;
+  is_required: boolean;
+  allowed_extensions: string[];
+}
+
+export const STANDARD_UPLOAD_PRESETS: UploadSlotConfig[] = [
+  { 
+    id: 'design', 
+    label: 'ملف التصميم الأساسي', 
+    help_text: 'يرجى رفع ملف بجودة 300 DPI بصيغة PDF أو AI مع زيادة القص 3 مم', 
+    is_required: true, 
+    allowed_extensions: ['pdf', 'ai', 'psd', 'zip', 'rar'] 
+  },
+  { 
+    id: 'spot_uv_mask', 
+    label: 'قناع الورنيش الموضعي (Spot UV)', 
+    help_text: 'ملف متجهي بلون أسود 100% لتحديد أماكن الورنيش الموضعي', 
+    is_required: false, 
+    allowed_extensions: ['pdf', 'ai'] 
+  },
+  { 
+    id: 'foil_mask', 
+    label: 'قناع الفويل / البصمة (Foil)', 
+    help_text: 'ملف متجهي بلون أسود 100% لتحديد أماكن البصمة الحرارية', 
+    is_required: false, 
+    allowed_extensions: ['pdf', 'ai'] 
+  },
+  { 
+    id: 'cutting_guide', 
+    label: 'دليل القص / الدايكت (Die-cut)', 
+    help_text: 'خطوط القص وريج الخط باللون الأحمر أو خط Spot مخصص', 
+    is_required: false, 
+    allowed_extensions: ['pdf', 'ai'] 
+  },
+  { 
+    id: 'emboss_mask', 
+    label: 'قناع البروز (Embossing)', 
+    help_text: 'ملف متجهي لتحديد أماكن الكشف والبروز', 
+    is_required: false, 
+    allowed_extensions: ['pdf', 'ai'] 
+  },
+];
+
+export const STANDARD_UPLOAD_CATEGORIES = STANDARD_UPLOAD_PRESETS.map(p => ({ id: p.id, label: p.label }));
+
+const normalizeSlots = (raw: any): UploadSlotConfig[] => {
+  if (!Array.isArray(raw) || raw.length === 0) {
+    return [STANDARD_UPLOAD_PRESETS[0]];
+  }
+  return raw.map((item: any) => {
+    if (typeof item === 'string') {
+      const preset = STANDARD_UPLOAD_PRESETS.find(p => p.id === item);
+      return preset ? { ...preset } : {
+        id: item,
+        label: item,
+        help_text: '',
+        is_required: false,
+        allowed_extensions: ['pdf', 'ai', 'psd', 'zip', 'rar']
+      };
+    }
+    const preset = STANDARD_UPLOAD_PRESETS.find(p => p.id === item.id);
+    return {
+      id: item.id || 'design',
+      label: item.label || preset?.label || item.id || 'ملف التصميم',
+      help_text: item.help_text !== undefined ? item.help_text : (preset?.help_text || ''),
+      is_required: Boolean(item.is_required !== undefined ? item.is_required : (preset?.is_required ?? false)),
+      allowed_extensions: Array.isArray(item.allowed_extensions) && item.allowed_extensions.length > 0
+        ? item.allowed_extensions.map((e: string) => e.replace(/^\./, '').toLowerCase().trim()).filter(Boolean)
+        : (preset?.allowed_extensions || ['pdf', 'ai', 'psd', 'zip', 'rar'])
+    };
+  });
+};
+
 const formSchema = z.object({
   name: z.string().min(1, 'الاسم مطلوب'),
   description: z.string().nullable(),
@@ -36,7 +112,7 @@ const formSchema = z.object({
     allow_additional_attachments: z.boolean().optional(),
     pricing_by_image_count: z.boolean().optional(),
   }).nullable().optional(),
-  upload_categories: z.array(z.string()).optional(),
+  upload_categories: z.array(z.any()).optional(),
   bleed_margin: z.number().min(0).optional(),
   safe_zone: z.number().min(0).optional(),
   thickness_factor: z.number().min(0).optional(),
@@ -46,14 +122,6 @@ const formSchema = z.object({
 });
 
 type FormValues = z.infer<typeof formSchema>;
-
-export const STANDARD_UPLOAD_CATEGORIES = [
-  { id: 'design', label: 'التصميم الأساسي (Design)' },
-  { id: 'spot_uv_mask', label: 'قناع الورنيش الموضعي (Spot UV)' },
-  { id: 'foil_mask', label: 'قناع الفويل / البصمة (Foil)' },
-  { id: 'cutting_guide', label: 'دليل القص / الدايكت (Die-cut)' },
-  { id: 'emboss_mask', label: 'قناع البروز (Embossing)' },
-];
 
 export default function PrintingTypeForm({ type }: { type: PrintingType }) {
   const updateMutation = useUpdatePrintingType();
@@ -84,7 +152,7 @@ export default function PrintingTypeForm({ type }: { type: PrintingType }) {
         allow_additional_attachments: false,
         pricing_by_image_count: false,
       },
-      upload_categories: type.upload_categories || ['design'],
+      upload_categories: normalizeSlots(type.upload_categories),
       bleed_margin: type.bleed_margin || 0,
       safe_zone: type.safe_zone || 0,
       thickness_factor: Number(type.thickness_factor) || 0,
@@ -108,6 +176,24 @@ export default function PrintingTypeForm({ type }: { type: PrintingType }) {
       setIsUploading(false);
     }
 
+    const cleanedUploadCategories = (data.upload_categories || []).map((slot: any) => ({
+      id: String(slot.id || '').trim().toLowerCase(),
+      label: String(slot.label || '').trim(),
+      help_text: slot.help_text && String(slot.help_text).trim() ? String(slot.help_text).trim() : null,
+      is_required: Boolean(slot.is_required),
+      allowed_extensions: (Array.isArray(slot.allowed_extensions) ? slot.allowed_extensions : ['pdf', 'ai', 'psd', 'zip', 'rar'])
+        .map((ext: string) => String(ext).replace(/^\./, '').toLowerCase().trim())
+        .filter(Boolean),
+    })).filter((s: any) => s.id && s.label);
+
+    if (data.requires_upload) {
+      const hasRequiredSlot = cleanedUploadCategories.some((s: any) => s.is_required);
+      if (!hasRequiredSlot) {
+        toast.error("طالما يتطلب هذا المنتج رفع ملفات، يجب تحديد خانة رفع واحدة على الأقل كخانة إلزامية.");
+        return;
+      }
+    }
+
     await updateMutation.mutateAsync({
       id: type.id,
       data: {
@@ -127,7 +213,7 @@ export default function PrintingTypeForm({ type }: { type: PrintingType }) {
         is_market_sensitive: data.is_market_sensitive ?? false,
         market_notice: data.market_notice || null,
         upload_rules: data.upload_rules,
-        upload_categories: data.upload_categories || [],
+        upload_categories: cleanedUploadCategories,
         bleed_margin: data.bleed_margin || 0,
         safe_zone: data.safe_zone || 0,
         thickness_factor: data.thickness_factor || 0,
@@ -139,29 +225,63 @@ export default function PrintingTypeForm({ type }: { type: PrintingType }) {
   };
 
   const pricingMethod = form.watch('pricing_method');
-  const currentCategories = form.watch('upload_categories') || [];
+  const currentSlots: UploadSlotConfig[] = form.watch('upload_categories') || [];
 
-  const toggleCategory = (catId: string) => {
-    const exists = currentCategories.includes(catId);
-    let next: string[];
-    if (exists) {
-      next = currentCategories.filter((c) => c !== catId);
-    } else {
-      next = [...currentCategories, catId];
-    }
+  const updateSlot = (index: number, patch: Partial<UploadSlotConfig>) => {
+    const next = [...currentSlots];
+    next[index] = { ...next[index], ...patch };
     form.setValue('upload_categories', next, { shouldDirty: true });
   };
 
-  const handleAddCustomCategory = () => {
-    const trimmed = customCategoryInput.trim().toLowerCase().replace(/\s+/g, '_');
-    if (trimmed && !currentCategories.includes(trimmed)) {
-      form.setValue('upload_categories', [...currentCategories, trimmed], { shouldDirty: true });
-      setCustomCategoryInput('');
+  const removeSlot = (index: number) => {
+    if (currentSlots.length <= 1) {
+      toast.error('يجب الإبقاء على خانة رفع واحدة على الأقل طالما أن رفع الملفات مطلوب.');
+      return;
     }
+    const next = currentSlots.filter((_, i) => i !== index);
+    form.setValue('upload_categories', next, { shouldDirty: true });
   };
 
-  const handleRemoveCategory = (catId: string) => {
-    form.setValue('upload_categories', currentCategories.filter((c) => c !== catId), { shouldDirty: true });
+  const toggleSlotExtension = (slotIndex: number, ext: string) => {
+    const cleanExt = ext.replace(/^\./, '').toLowerCase().trim();
+    const slot = currentSlots[slotIndex];
+    const currentExts = slot.allowed_extensions || [];
+    const exists = currentExts.includes(cleanExt);
+    let nextExts: string[];
+    if (exists) {
+      if (currentExts.length <= 1) {
+        toast.error('يجب تحديد امتداد واحد على الأقل مسموح به.');
+        return;
+      }
+      nextExts = currentExts.filter((e) => e !== cleanExt);
+    } else {
+      nextExts = [...currentExts, cleanExt];
+    }
+    updateSlot(slotIndex, { allowed_extensions: nextExts });
+  };
+
+  const addPresetSlot = (preset: UploadSlotConfig) => {
+    if (currentSlots.some((s) => s.id === preset.id)) {
+      toast.error('هذه الخانة مضافة بالفعل.');
+      return;
+    }
+    const next = [...currentSlots, { ...preset }];
+    form.setValue('upload_categories', next, { shouldDirty: true });
+  };
+
+  const handleAddCustomSlot = () => {
+    const labelTrimmed = customCategoryInput.trim();
+    if (!labelTrimmed) return;
+    const cleanId = `custom_${Date.now()}`;
+    const newSlot: UploadSlotConfig = {
+      id: cleanId,
+      label: labelTrimmed,
+      help_text: '',
+      is_required: false,
+      allowed_extensions: ['pdf', 'ai', 'psd', 'zip', 'rar'],
+    };
+    form.setValue('upload_categories', [...currentSlots, newSlot], { shouldDirty: true });
+    setCustomCategoryInput('');
   };
 
   return (
@@ -392,59 +512,127 @@ export default function PrintingTypeForm({ type }: { type: PrintingType }) {
 
           <div className="space-y-4 pt-4 border-t border-blue-200">
             <div>
-              <Label className="text-sm font-semibold text-blue-950">تصنيفات الملفات المطلوبة للرفع (Upload Categories)</Label>
-              <p className="text-xs text-gray-500 mt-0.5">حدد الملفات المطلوب من العميل رفعها لطلب هذا المنتج (مثل ملف التصميم الأساسي، قناع الورنيش، إلخ).</p>
+              <Label className="text-sm font-semibold text-blue-950">إدارة خانات رفع الملفات (Upload Slots Builder)</Label>
+              <p className="text-xs text-gray-500 mt-0.5">خصص العناوين والتعليمات والامتدادات المسموحة لكل خانة تظهر للعميل في المتجر.</p>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-              {STANDARD_UPLOAD_CATEGORIES.map((cat) => {
-                const isSelected = currentCategories.includes(cat.id);
-                return (
-                  <label
-                    key={cat.id}
-                    className={`flex items-center gap-2 p-3 rounded-lg border text-sm cursor-pointer transition-colors ${
-                      isSelected ? 'bg-blue-100/80 border-blue-400 font-medium text-blue-900' : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'
-                    }`}
-                  >
-                    <input
-                      type="checkbox"
-                      className="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500 cursor-pointer"
-                      checked={isSelected}
-                      onChange={() => toggleCategory(cat.id)}
-                    />
-                    <span>{cat.label}</span>
-                  </label>
-                );
-              })}
-            </div>
+            {/* List of current slots */}
+            <div className="space-y-3">
+              {currentSlots.map((slot, idx) => (
+                <div key={slot.id} className="p-4 bg-white rounded-xl border border-blue-200 shadow-2xs space-y-3">
+                  <div className="flex items-center justify-between border-b border-gray-100 pb-2">
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono text-xs bg-blue-50 text-blue-700 px-2 py-0.5 rounded font-bold border border-blue-200">
+                        #{slot.id}
+                      </span>
+                      <span className="text-xs text-gray-400">خانة {idx + 1}</span>
+                    </div>
+                    <div className="flex items-center gap-4">
+                      <label className="flex items-center gap-1.5 text-xs font-bold text-gray-700 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          className="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500 cursor-pointer"
+                          checked={slot.is_required}
+                          onChange={(e) => updateSlot(idx, { is_required: e.target.checked })}
+                        />
+                        <span>إجباري للطلب (*)</span>
+                      </label>
+                      {currentSlots.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => removeSlot(idx)}
+                          className="text-gray-400 hover:text-red-600 p-1 rounded transition-colors"
+                          title="حذف هذه الخانة"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      )}
+                    </div>
+                  </div>
 
-            {currentCategories.filter(c => !STANDARD_UPLOAD_CATEGORIES.some(sc => sc.id === c)).length > 0 && (
-              <div className="space-y-1.5 pt-2">
-                <span className="text-xs font-medium text-gray-600">تصنيفات مخصصة إضافية:</span>
-                <div className="flex flex-wrap gap-2">
-                  {currentCategories.filter(c => !STANDARD_UPLOAD_CATEGORIES.some(sc => sc.id === c)).map((cat) => (
-                    <span key={cat} className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs bg-blue-100 text-blue-800 border border-blue-300">
-                      <code>{cat}</code>
-                      <button type="button" onClick={() => handleRemoveCategory(cat)} className="text-blue-600 hover:text-red-600 font-bold ml-1">
-                        &times;
-                      </button>
-                    </span>
-                  ))}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <Label className="text-xs font-semibold text-gray-700">عنوان البوكس في المتجر (*)</Label>
+                      <Input
+                        value={slot.label}
+                        onChange={(e) => updateSlot(idx, { label: e.target.value })}
+                        placeholder="مثال: ملف التصميم الأساسي"
+                        className="h-8 text-xs bg-white"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs font-semibold text-gray-700">التعليمات والنص الإرشادي (Help Text)</Label>
+                      <Input
+                        value={slot.help_text || ''}
+                        onChange={(e) => updateSlot(idx, { help_text: e.target.value })}
+                        placeholder="مثال: يرجى ترك زيادة قص 3 مم وألوان CMYK"
+                        className="h-8 text-xs bg-white"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-1 pt-1">
+                    <Label className="text-[11px] font-semibold text-gray-600">الصيغ والامتدادات المسموحة:</Label>
+                    <div className="flex flex-wrap gap-1.5 items-center">
+                      {['pdf', 'ai', 'psd', 'zip', 'rar', 'jpg', 'png'].map((ext) => {
+                        const isAllowed = (slot.allowed_extensions || []).includes(ext);
+                        return (
+                          <button
+                            key={ext}
+                            type="button"
+                            onClick={() => toggleSlotExtension(idx, ext)}
+                            className={`px-2 py-0.5 rounded text-[11px] font-mono font-bold uppercase transition-colors border ${
+                              isAllowed 
+                                ? 'bg-blue-600 text-white border-blue-600' 
+                                : 'bg-gray-100 text-gray-500 border-gray-200 hover:bg-gray-200'
+                            }`}
+                          >
+                            .{ext}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
                 </div>
-              </div>
-            )}
+              ))}
+            </div>
 
-            <div className="flex gap-2 max-w-sm pt-2">
-              <Input
-                placeholder="إضافة تصنيف مخصص (مثال: booklet_inner)"
-                value={customCategoryInput}
-                onChange={(e) => setCustomCategoryInput(e.target.value)}
-                onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddCustomCategory(); } }}
-                className="text-xs bg-white"
-              />
-              <Button type="button" variant="outline" size="sm" onClick={handleAddCustomCategory}>
-                إضافة
-              </Button>
+            {/* Quick Presets & Add custom */}
+            <div className="bg-blue-50/70 p-3 rounded-xl border border-blue-100 space-y-2">
+              <span className="text-xs font-semibold text-blue-900 block">إضافة خانة جديدة سريعة من القوالب:</span>
+              <div className="flex flex-wrap gap-2">
+                {STANDARD_UPLOAD_PRESETS.map((preset) => {
+                  const alreadyAdded = currentSlots.some((s) => s.id === preset.id);
+                  return (
+                    <button
+                      key={preset.id}
+                      type="button"
+                      disabled={alreadyAdded}
+                      onClick={() => addPresetSlot(preset)}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
+                        alreadyAdded 
+                          ? 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed opacity-60' 
+                          : 'bg-white text-blue-800 border-blue-300 hover:bg-blue-100'
+                      }`}
+                    >
+                      + {preset.label}
+                    </button>
+                  );
+                })}
+              </div>
+
+              <div className="flex gap-2 pt-2 border-t border-blue-200/60 max-w-md">
+                <Input
+                  placeholder="أو اكتب عنوان خانة مخصصة (مثال: غلاف المذكرة)"
+                  value={customCategoryInput}
+                  onChange={(e) => setCustomCategoryInput(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddCustomSlot(); } }}
+                  className="h-8 text-xs bg-white"
+                />
+                <Button type="button" variant="outline" size="sm" onClick={handleAddCustomSlot} className="h-8 text-xs shrink-0">
+                  إضافة خانة مخصصة
+                </Button>
+              </div>
             </div>
           </div>
         </div>
