@@ -113,34 +113,48 @@ export function OrderDetailsModal({ order, isOpen, onClose, onOrderUpdated }: Or
   };
 
   const handleDownloadFile = async (addonId: number | string, fileIndex: number) => {
-    const key = `${addonId}-${fileIndex}`;
+    const key = `addon-${addonId}-${fileIndex}`;
     try {
       setDownloadingKey(key);
       const token = getAuthToken();
-      const res = await fetch(`${API_BASE_URL}/v1/admin/orders/items/addons/${addonId}/files/${fileIndex}/download`, {
+      const res = await fetch(`${API_BASE_URL}/v1/admin/orders/items/addons/${addonId}/files/${fileIndex}/download?json=1`, {
         headers: {
+          'Accept': 'application/json',
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
       });
 
+      const data = await res.json().catch(() => ({}));
+
       if (!res.ok) {
-        throw new Error(`فشل التحميل (${res.status})`);
+        if (res.status === 410) {
+          toast.error(data.message || "تم أرشفة وحذف هذا الملف تلقائياً لمرور أكثر من 14 يوماً على تسليم الطلب.");
+        } else if (res.status === 404) {
+          toast.error(data.message || "الملف المطلوب غير موجود على الخادم.");
+        } else if (res.status === 403) {
+          toast.error(data.message || "مسار الملف غير مسموح به أمنياً.");
+        } else {
+          toast.error(data.message || `فشل التحميل (${res.status})`);
+        }
+        return;
       }
 
-      const blob = await res.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `addon-file-${fileIndex + 1}`;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      a.remove();
+      if (data.download_url) {
+        const a = document.createElement("a");
+        a.href = data.download_url;
+        if (data.name) a.setAttribute("download", data.name);
+        a.style.display = "none";
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(() => {
+          document.body.removeChild(a);
+        }, 1000);
+      } else {
+        toast.error("تعذر الحصول على رابط التنزيل المباشر.");
+      }
     } catch (err: any) {
-      console.error("Download failed via blob, falling back to direct URL:", err);
-      const token = getAuthToken();
-      const directUrl = `${API_BASE_URL}/v1/admin/orders/items/addons/${addonId}/files/${fileIndex}/download?token=${encodeURIComponent(token)}`;
-      window.open(directUrl, "_blank");
+      console.error("Download trigger failed for addon file:", err);
+      toast.error("تعذر الاتصال بالخادم لبدء التحميل.");
     } finally {
       setDownloadingKey(null);
     }
@@ -151,30 +165,44 @@ export function OrderDetailsModal({ order, isOpen, onClose, onOrderUpdated }: Or
     try {
       setDownloadingKey(key);
       const token = getAuthToken();
-      const res = await fetch(`${API_BASE_URL}/v1/admin/orders/items/${itemId}/files/${category}/download`, {
+      const res = await fetch(`${API_BASE_URL}/v1/admin/orders/items/${itemId}/files/${category}/download?json=1`, {
         headers: {
+          'Accept': 'application/json',
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
       });
 
+      const data = await res.json().catch(() => ({}));
+
       if (!res.ok) {
-        throw new Error(`فشل التحميل (${res.status})`);
+        if (res.status === 410) {
+          toast.error(data.message || "تم أرشفة وحذف هذا الملف تلقائياً لمرور أكثر من 14 يوماً على تسليم الطلب.");
+        } else if (res.status === 404) {
+          toast.error(data.message || "الملف المطلوب غير موجود على الخادم.");
+        } else if (res.status === 403) {
+          toast.error(data.message || "مسار الملف غير مسموح به أمنياً.");
+        } else {
+          toast.error(data.message || `فشل التحميل (${res.status})`);
+        }
+        return;
       }
 
-      const blob = await res.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `order-${orderId}-item-${itemId}-${category}`;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      a.remove();
+      if (data.download_url) {
+        const a = document.createElement("a");
+        a.href = data.download_url;
+        if (data.name) a.setAttribute("download", data.name);
+        a.style.display = "none";
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(() => {
+          document.body.removeChild(a);
+        }, 1000);
+      } else {
+        toast.error("تعذر الحصول على رابط التنزيل المباشر.");
+      }
     } catch (err: any) {
-      console.error("Download failed via blob, falling back to direct URL:", err);
-      const token = getAuthToken();
-      const directUrl = `${API_BASE_URL}/v1/admin/orders/items/${itemId}/files/${category}/download?token=${encodeURIComponent(token)}`;
-      window.open(directUrl, "_blank");
+      console.error("Download trigger failed for print file:", err);
+      toast.error("تعذر الاتصال بالخادم لبدء التحميل.");
     } finally {
       setDownloadingKey(null);
     }
@@ -539,8 +567,20 @@ export function OrderDetailsModal({ order, isOpen, onClose, onOrderUpdated }: Or
                                 {addon.file_paths && addon.file_paths.length > 0 && (
                                   <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                                     <span className="text-[11px] text-emerald-600 font-medium">الملفات:</span>
-                                    {addon.file_paths.map((fPath: string, fIdx: number) => {
-                                      const key = `${addon.id}-${fIdx}`;
+                                    {addon.file_paths.map((fileEntry: any, fIdx: number) => {
+                                      const fPath = typeof fileEntry === 'object' && fileEntry !== null ? fileEntry.path : fileEntry;
+                                      const fName = typeof fileEntry === 'object' && fileEntry !== null ? fileEntry.name : null;
+                                      const isArchived = fPath === 'deleted_by_retention' || fPath === 'deleted_by_system';
+
+                                      if (isArchived) {
+                                        return (
+                                          <span key={fIdx} className="text-[10px] text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200">
+                                            ملف {fIdx + 1} مؤرشف
+                                          </span>
+                                        );
+                                      }
+
+                                      const key = `addon-${addon.id}-${fIdx}`;
                                       const isDownloading = downloadingKey === key;
                                       return (
                                         <button
@@ -548,9 +588,11 @@ export function OrderDetailsModal({ order, isOpen, onClose, onOrderUpdated }: Or
                                           type="button"
                                           onClick={() => handleDownloadFile(addon.id, fIdx)}
                                           disabled={isDownloading}
-                                          className="text-[11px] text-blue-600 underline hover:text-blue-800 font-medium disabled:opacity-50 cursor-pointer"
+                                          className="text-[11px] text-blue-600 underline hover:text-blue-800 font-medium disabled:opacity-50 cursor-pointer inline-flex items-center gap-1"
+                                          title={fName ? `الملف: ${fName}` : undefined}
                                         >
-                                          {isDownloading ? "جاري التحميل..." : `تحميل ملف ${fIdx + 1}`}
+                                          <Download className="w-3 h-3 text-blue-600 inline" />
+                                          {isDownloading ? "جاري التحميل..." : (fName ? `تحميل ${fName}` : `تحميل ملف ${fIdx + 1}`)}
                                         </button>
                                       );
                                     })}
