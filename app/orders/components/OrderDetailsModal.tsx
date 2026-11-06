@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { 
   MapPin, Phone, MessageCircle, Package, User, CheckCircle2, Download, 
-  FileText, Printer, Edit3, Link as LinkIcon, Copy, Check, DollarSign, AlertTriangle, Loader2 
+  FileText, Printer, Edit3, Link as LinkIcon, Copy, Check, DollarSign, AlertTriangle, AlertCircle, RefreshCw, ExternalLink, Loader2 
 } from "lucide-react";
 import { Order, OrderItemAddon } from "../types/order.types";
 import { PaymentBadge } from "./PaymentBadge";
@@ -60,6 +60,8 @@ export function OrderDetailsModal({ order, isOpen, onClose, onOrderUpdated }: Or
   const [manualNotes, setManualNotes] = useState("");
   const [isSubmittingManual, setIsSubmittingManual] = useState(false);
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
+  const [isPrintingAwb, setIsPrintingAwb] = useState(false);
+  const [isRetryingWaybill, setIsRetryingWaybill] = useState(false);
 
   useEffect(() => {
     setCurrentOrder(order);
@@ -215,6 +217,81 @@ export function OrderDetailsModal({ order, isOpen, onClose, onOrderUpdated }: Or
   const statusConfig = ORDER_STATUS_MAP[effectiveStatus] || {
     label: effectiveStatus,
     className: "bg-slate-100 text-slate-700 border-slate-200"
+  };
+
+  const handlePrintAwb = async (format: 'A6' | 'A4' = 'A6') => {
+    if (!rawOrderId) return;
+
+    setIsPrintingAwb(true);
+    const toastId = toast.loading(`جاري استخراج بوليصة بوسطة (${format})...`);
+    try {
+      const token = getAuthToken();
+      const res = await fetch(`${API_BASE_URL}/v1/admin/orders/${rawOrderId}/shipping/awb?format=${format}`, {
+        headers: {
+          Accept: "application/pdf, application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.message || `فشل جلب البوليصة من بوسطة (${res.status})`);
+      }
+
+      const blob = await res.blob();
+      const blobUrl = URL.createObjectURL(blob);
+
+      // تشغيل التنزيل / الطباعة
+      const a = document.createElement("a");
+      a.href = blobUrl;
+      const tracking = (currentOrder as any)?.tracking_number || (order as any)?.tracking_number || rawOrderId;
+      a.download = `Bosta-AWB-${tracking}-${format}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+
+      toast.success("تم تنزيل بوليصة الشحن بنجاح.", { id: toastId });
+      setTimeout(() => {
+        URL.revokeObjectURL(blobUrl);
+      }, 10000);
+    } catch (err: any) {
+      toast.error(err.message || "حدث خطأ أثناء تحميل بوليصة الشحن.", { id: toastId });
+    } finally {
+      setIsPrintingAwb(false);
+    }
+  };
+
+  const handleRetryWaybill = async () => {
+    if (!rawOrderId) return;
+
+    setIsRetryingWaybill(true);
+    const toastId = toast.loading("جاري الاتصال بخوادم بوسطة لإصدار البوليصة لحظياً...");
+    try {
+      const token = getAuthToken();
+      const res = await fetch(`${API_BASE_URL}/v1/admin/orders/${rawOrderId}/shipping/retry-waybill`, {
+        method: "POST",
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data.message || "فشل إصدار البوليصة من بوسطة.");
+      }
+
+      toast.success(data.message || "تم إصدار بوليصة الشحن بنجاح! 🚀", { id: toastId });
+      if (data.order) {
+        setCurrentOrder(data.order);
+      }
+      if (onOrderUpdated) onOrderUpdated();
+    } catch (err: any) {
+      toast.error(err.message || "حدث خطأ أثناء إصدار البوليصة.", { id: toastId });
+    } finally {
+      setIsRetryingWaybill(false);
+    }
   };
 
   const handleUpdateOrderStatus = async (newStatus: string) => {
@@ -419,6 +496,30 @@ export function OrderDetailsModal({ order, isOpen, onClose, onOrderUpdated }: Or
             </div>
           </div>
 
+          {/* Shipping Error Banner */}
+          {(currentOrder?.shipping_error_log || (order as any).shipping_error_log) && (
+            <div className="bg-rose-50 border border-rose-200 rounded-2xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-2xs">
+              <div className="flex items-start gap-2.5">
+                <AlertCircle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-xs font-bold text-rose-900">تعذر إصدار بوليصة بوسطة تلقائياً:</p>
+                  <p className="text-xs text-rose-700 mt-0.5 font-medium leading-relaxed">
+                    {currentOrder?.shipping_error_log || (order as any).shipping_error_log}
+                  </p>
+                </div>
+              </div>
+              <Button
+                size="sm"
+                onClick={handleRetryWaybill}
+                disabled={isRetryingWaybill}
+                className="bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold shrink-0 rounded-xl gap-1.5 shadow-sm"
+              >
+                {isRetryingWaybill ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
+                إعادة إصدار البوليصة
+              </Button>
+            </div>
+          )}
+
           {/* Shipping Method & Carrier Details */}
           <div className="bg-slate-50/70 p-4 rounded-2xl border border-slate-100 flex flex-wrap items-center justify-between gap-3 text-sm">
             <div className="flex items-center gap-2">
@@ -441,12 +542,45 @@ export function OrderDetailsModal({ order, isOpen, onClose, onOrderUpdated }: Or
                 </span>
               </div>
             )}
-            {(order as any).tracking_number && (
-              <div className="flex items-center gap-2">
+            {((currentOrder as any)?.tracking_number || (order as any).tracking_number) && (
+              <div className="flex flex-wrap items-center gap-2">
                 <span className="text-xs font-bold text-slate-500">رقم البوليصة:</span>
                 <span className="font-mono text-xs font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded border border-blue-100">
-                  {(order as any).tracking_number}
+                  {(currentOrder as any)?.tracking_number || (order as any).tracking_number}
                 </span>
+
+                <div className="flex items-center gap-1.5 mr-auto">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => handlePrintAwb('A6')}
+                    disabled={isPrintingAwb}
+                    className="h-7 text-xs font-bold text-blue-700 bg-white border-blue-200 hover:bg-blue-50 gap-1 rounded-lg shadow-2xs"
+                    title="طباعة استيكر البوليصة للطابعات الحرارية"
+                  >
+                    {isPrintingAwb ? <Loader2 className="w-3.5 h-3.5 animate-spin text-blue-600" /> : <Printer className="w-3.5 h-3.5 text-blue-600" />}
+                    طباعة (A6)
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => handlePrintAwb('A4')}
+                    disabled={isPrintingAwb}
+                    className="h-7 text-xs font-bold text-slate-700 bg-white border-slate-200 hover:bg-slate-50 gap-1 rounded-lg shadow-2xs"
+                    title="طباعة بوليصة ورق عادي A4"
+                  >
+                    طباعة (A4)
+                  </Button>
+                  <a
+                    href={`https://bosta.co/tracking-shipment/?track=${(currentOrder as any)?.tracking_number || (order as any).tracking_number}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 h-7 px-2.5 text-xs font-bold text-slate-700 bg-white border border-slate-200 hover:bg-slate-50 rounded-lg shadow-2xs transition-colors"
+                  >
+                    <ExternalLink className="w-3.5 h-3.5 text-slate-500" />
+                    تتبع الشحنة
+                  </a>
+                </div>
               </div>
             )}
           </div>
