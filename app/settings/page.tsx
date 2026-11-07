@@ -926,7 +926,7 @@ export default function SettingsPage() {
                         value={localSettings.whatsapp_number || ""}
                         onChange={(e) => setLocalSettings((s: any) => ({ ...s, whatsapp_number: e.target.value }))}
                         className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2.5 px-4 text-slate-900 font-mono font-bold focus:bg-white outline-none text-left"
-                        placeholder="01000000000"
+                        placeholder="01011348890"
                         dir="ltr"
                       />
                     </div>
