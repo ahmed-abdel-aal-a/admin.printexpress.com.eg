@@ -942,7 +942,19 @@ export default function SettingsPage() {
                       value={localSettings.store_phone || ""}
                       onChange={(e) => setLocalSettings((s: any) => ({ ...s, store_phone: e.target.value }))}
                       className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2.5 px-4 text-slate-900 font-bold focus:bg-white outline-none text-left"
-                      placeholder="01000000000"
+                      placeholder="01011348890"
+                      dir="ltr"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-bold text-slate-700 mb-2">هاتف الإدارة / المالك</label>
+                    <input
+                      type="text"
+                      value={localSettings.owner_phone || ""}
+                      onChange={(e) => setLocalSettings((s: any) => ({ ...s, owner_phone: e.target.value }))}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2.5 px-4 text-slate-900 font-bold focus:bg-white outline-none text-left"
+                      placeholder="01023336371"
                       dir="ltr"
                     />
                   </div>
@@ -954,9 +966,75 @@ export default function SettingsPage() {
                       value={localSettings.store_email || ""}
                       onChange={(e) => setLocalSettings((s: any) => ({ ...s, store_email: e.target.value }))}
                       className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2.5 px-4 text-slate-900 font-medium focus:bg-white outline-none text-left"
-                      placeholder="support@apexstore.com"
+                      placeholder="support@printexpress.com.eg"
                       dir="ltr"
                     />
+                  </div>
+
+                  <div className="md:col-span-2">
+                    <label className="block text-sm font-bold text-slate-700 mb-2">رابط موقع المطبعة على خرائط جوجل (Google Maps)</label>
+                    <input
+                      type="url"
+                      value={localSettings.store_location_map || ""}
+                      onChange={(e) => setLocalSettings((s: any) => ({ ...s, store_location_map: e.target.value, google_maps_url: e.target.value }))}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2.5 px-4 text-slate-900 font-medium focus:bg-white outline-none text-left"
+                      placeholder="https://maps.app.goo.gl/..."
+                      dir="ltr"
+                    />
+                  </div>
+                </div>
+
+                {/* Social Media Channels */}
+                <div className="border-t border-slate-100 pt-6">
+                  <h3 className="text-base font-bold text-slate-800 mb-4 flex items-center gap-2">
+                    <Sparkles className="w-4 h-4 text-amber-500" />
+                    منصات التواصل الاجتماعي الرسمية
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-600 mb-1.5">رابط فيسبوك (Facebook)</label>
+                      <input
+                        type="url"
+                        value={localSettings.social_facebook || ""}
+                        onChange={(e) => setLocalSettings((s: any) => ({ ...s, social_facebook: e.target.value }))}
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2 px-3 text-xs font-medium text-slate-900 focus:bg-white outline-none text-left"
+                        placeholder="https://facebook.com/..."
+                        dir="ltr"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-slate-600 mb-1.5">رابط إنستجرام (Instagram)</label>
+                      <input
+                        type="url"
+                        value={localSettings.social_instagram || ""}
+                        onChange={(e) => setLocalSettings((s: any) => ({ ...s, social_instagram: e.target.value }))}
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2 px-3 text-xs font-medium text-slate-900 focus:bg-white outline-none text-left"
+                        placeholder="https://instagram.com/..."
+                        dir="ltr"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-slate-600 mb-1.5">رابط تيك توك (TikTok)</label>
+                      <input
+                        type="url"
+                        value={localSettings.social_tiktok || ""}
+                        onChange={(e) => setLocalSettings((s: any) => ({ ...s, social_tiktok: e.target.value }))}
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2 px-3 text-xs font-medium text-slate-900 focus:bg-white outline-none text-left"
+                        placeholder="https://tiktok.com/@..."
+                        dir="ltr"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-slate-600 mb-1.5">رابط يوتيوب (YouTube)</label>
+                      <input
+                        type="url"
+                        value={localSettings.social_youtube || ""}
+                        onChange={(e) => setLocalSettings((s: any) => ({ ...s, social_youtube: e.target.value }))}
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2 px-3 text-xs font-medium text-slate-900 focus:bg-white outline-none text-left"
+                        placeholder="https://youtube.com/@..."
+                        dir="ltr"
+                      />
+                    </div>
                   </div>
                 </div>
 
